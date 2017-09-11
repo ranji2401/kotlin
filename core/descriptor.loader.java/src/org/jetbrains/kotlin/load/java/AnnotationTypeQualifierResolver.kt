@@ -39,7 +39,7 @@ private val TYPE_QUALIFIER_NICKNAME_FQNAME = FqName("javax.annotation.meta.TypeQ
 private val TYPE_QUALIFIER_FQNAME = FqName("javax.annotation.meta.TypeQualifier")
 private val TYPE_QUALIFIER_DEFAULT_FQNAME = FqName("javax.annotation.meta.TypeQualifierDefault")
 
-private val MIGRATION_ANNOTATION_FQNAME = FqName("kotlin.annotation.UnderMigration")
+private val MIGRATION_ANNOTATION_FQNAME = FqName("kotlin.annotations.jvm.UnderMigration")
 
 private val BUILT_IN_TYPE_QUALIFIER_DEFAULT_ANNOTATIONS = mapOf(
         FqName("javax.annotation.ParametersAreNullableByDefault") to

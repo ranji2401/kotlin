@@ -99,20 +99,3 @@ public annotation class Repeatable
  */
 @Target(AnnotationTarget.ANNOTATION_CLASS)
 public annotation class MustBeDocumented
-
-/**
- * Contains the list of possible migration statuses.
- */
-public enum class MigrationStatus {
-    IGNORE,
-    WARN,
-    @Deprecated("experimental feature")
-    STRICT
-}
-
-/**
- * This meta-annotation is intended for user nullability annotations with JSR-305 type qualifiers. Behaviour of meta-annotated
- * nullability annotations can be controlled via compilation flag.
- */
-@Target(AnnotationTarget.ANNOTATION_CLASS)
-public annotation class UnderMigration(val status: MigrationStatus)

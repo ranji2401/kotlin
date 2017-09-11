@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.checkers
 
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.test.ConfigurationKind
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
@@ -34,7 +35,7 @@ abstract class AbstractForeignAnnotationsTest : AbstractDiagnosticsTest() {
     private val JSR305_SPECIAL_DIRECTIVE = "JSR305_SPECIAL_REPORT"
 
     override fun getExtraClasspath(): List<File> {
-        val foreignAnnotations = listOf(MockLibraryUtil.compileJvmLibraryToJar(annotationsPath, "foreign-annotations"))
+        val foreignAnnotations = createJarWithForeignAnnotations()
         return foreignAnnotations + compileTestAnnotations(foreignAnnotations)
     }
 
@@ -42,8 +43,14 @@ abstract class AbstractForeignAnnotationsTest : AbstractDiagnosticsTest() {
             listOf(MockLibraryUtil.compileJvmLibraryToJar(
                 TEST_ANNOTATIONS_SOURCE_PATH,
                 "test-foreign-annotations",
+                extraOptions = listOf("-Xallow-kotlin-package"),
                 extraClasspath = extraClassPath.map { it.path }
         ))
+
+    protected fun createJarWithForeignAnnotations(): List<File> = listOf(
+            MockLibraryUtil.compileJvmLibraryToJar(annotationsPath, "foreign-annotations"),
+            ForTestCompileRuntime.jvmAnnotationsForTests()
+    )
 
     override fun getConfigurationKind(): ConfigurationKind = ConfigurationKind.ALL
 
