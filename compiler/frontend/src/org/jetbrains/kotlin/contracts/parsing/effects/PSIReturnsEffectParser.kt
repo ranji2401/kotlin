@@ -16,12 +16,11 @@
 
 package org.jetbrains.kotlin.contracts.parsing.effects
 
-import org.jetbrains.kotlin.config.LanguageFeature
+import org.jetbrains.kotlin.contracts.parsing.*
 import org.jetbrains.kotlin.descriptors.contracts.EffectDeclaration
 import org.jetbrains.kotlin.descriptors.contracts.effects.ReturnsEffectDeclaration
 import org.jetbrains.kotlin.descriptors.contracts.expressions.ConstantDescriptor
 import org.jetbrains.kotlin.diagnostics.Errors
-import org.jetbrains.kotlin.contracts.parsing.*
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
@@ -31,10 +30,6 @@ internal class PSIReturnsEffectParser(
         contractParserDispatcher: PSIContractParserDispatcher
 ) : AbstractPSIEffectParser(trace, contractParserDispatcher) {
     override fun tryParseEffect(expression: KtExpression): EffectDeclaration? {
-        if (!contractParserDispatcher.contractParsingServices.languageVersionSettings.supportsFeature(LanguageFeature.ReturnsEffect)) {
-            return null
-        }
-
         val resolvedCall = expression.getResolvedCall(trace.bindingContext) ?: return null
         val descriptor = resolvedCall.resultingDescriptor
 

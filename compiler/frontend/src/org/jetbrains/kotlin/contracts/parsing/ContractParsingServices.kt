@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.contracts.parsing
 
+import org.jetbrains.kotlin.config.AnalysisFlag
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
@@ -43,20 +44,23 @@ class ContractParsingServices(val languageVersionSettings: LanguageVersionSettin
         val contractProvider = ownerDescriptor.getUserData(ContractProviderKey) ?: return
 
         val isFeatureTurnedOn = languageVersionSettings.supportsFeature(LanguageFeature.CallsInPlaceEffect) ||
-                                languageVersionSettings.supportsFeature(LanguageFeature.ReturnsEffect)
+                                languageVersionSettings.supportsFeature(LanguageFeature.ReturnsEffect) ||
+                                // This condition is here for technical purposes of compiling 1.2-runtime with contracts
+                                languageVersionSettings.getFlag(AnalysisFlag.Flags.allowKotlinPackage)
 
-        if (!isContractDescriptionCallPreciseCheck(expression, trace.bindingContext)) {
-            contractProvider.setContractDescriptor(null)
-            return
+
+        val contractDescriptor = when {
+            !isFeatureTurnedOn || !isContractDescriptionCallPreciseCheck(expression, trace.bindingContext) -> null
+
+            !isContractAllowedHere(scope) || !isFirstStatement -> {
+                trace.report(Errors.CONTRACT_NOT_ALLOWED.on(expression))
+                null
+            }
+
+            else -> parseContract(expression, trace, ownerDescriptor)
         }
 
-        if (!isContractAllowedHere(scope) || !isFirstStatement) {
-            if (isFeatureTurnedOn) trace.report(Errors.CONTRACT_NOT_ALLOWED.on(expression))
-            contractProvider.setContractDescriptor(null)
-            return
-        }
-
-        contractProvider.setContractDescriptor(parseContract(expression, trace, ownerDescriptor))
+        contractProvider.setContractDescriptor(contractDescriptor)
     }
 
     private fun parseContract(expression: KtExpression?, trace: BindingTrace, ownerDescriptor: FunctionDescriptor): ContractDescriptor? {
