@@ -22,6 +22,12 @@ import org.jetbrains.kotlin.builtins.transformSuspendFunctionToRuntimeFunctionTy
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotated
+import org.jetbrains.kotlin.descriptors.contracts.*
+import org.jetbrains.kotlin.descriptors.contracts.effects.CallsEffectDeclaration
+import org.jetbrains.kotlin.descriptors.contracts.effects.ConditionalEffectDeclaration
+import org.jetbrains.kotlin.descriptors.contracts.effects.InvocationKind
+import org.jetbrains.kotlin.descriptors.contracts.effects.ReturnsEffectDeclaration
+import org.jetbrains.kotlin.descriptors.contracts.expressions.*
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.protobuf.MessageLite
@@ -275,6 +281,12 @@ class DescriptorSerializer private constructor(
 
         if (descriptor.isSuspendOrHasSuspendTypesInSignature()) {
             builder.sinceKotlinInfo = writeSinceKotlinInfo(LanguageFeature.Coroutines)
+        }
+
+        val contractDescriptor = descriptor.getUserData(ContractProviderKey)?.getContractDescriptor()
+        if (contractDescriptor != null) {
+            val serializedContract = contractProto(contractDescriptor)
+            builder.setContract(serializedContract)
         }
 
         extension.serializeFunction(descriptor, builder)
@@ -586,6 +598,166 @@ class DescriptorSerializer private constructor(
 
     private fun getTypeParameterId(descriptor: TypeParameterDescriptor): Int =
             typeParameters.intern(descriptor)
+
+    private fun contractProto(contractDescriptor: ContractDescriptor): ProtoBuf.Contract.Builder? {
+        return ProtoBuf.Contract.newBuilder().apply {
+            contractDescriptor.effects.forEach { addEffect(effectProto(it, contractDescriptor)) }
+        }
+    }
+
+    private fun effectProto(effectDeclaration: EffectDeclaration, contractDescriptor: ContractDescriptor): ProtoBuf.Effect.Builder? {
+        return ProtoBuf.Effect.newBuilder().apply {
+            fillEffectProto(this, effectDeclaration, contractDescriptor)
+        }
+    }
+
+    private fun fillEffectProto(builder: ProtoBuf.Effect.Builder, effectDeclaration: EffectDeclaration, contractDescriptor: ContractDescriptor) {
+        when (effectDeclaration) {
+            is ConditionalEffectDeclaration -> {
+                builder.setConclusionOfConditionalEffect(contractExpressionProto(effectDeclaration.condition, contractDescriptor))
+                fillEffectProto(builder, effectDeclaration.effect, contractDescriptor)
+            }
+
+            is ReturnsEffectDeclaration -> {
+                when {
+                    effectDeclaration.value == ConstantDescriptor.NOT_NULL -> builder.effectType = ProtoBuf.Effect.EffectType.RETURNS_NOT_NULL
+                    effectDeclaration.value == ConstantDescriptor.WILDCARD -> builder.effectType = ProtoBuf.Effect.EffectType.RETURNS_CONSTANT
+                    else -> {
+                        builder.effectType = ProtoBuf.Effect.EffectType.RETURNS_CONSTANT
+                        builder.addEffectConstructorArguments(contractExpressionProto(effectDeclaration.value, contractDescriptor))
+                    }
+                }
+            }
+
+            is CallsEffectDeclaration -> {
+                builder.effectType = ProtoBuf.Effect.EffectType.CALLS
+                builder.addEffectConstructorArguments(contractExpressionProto(effectDeclaration.variableReference, contractDescriptor))
+                val invocationKindProtobufEnum = invocationKindProtobufEnum(effectDeclaration.kind)
+                if (invocationKindProtobufEnum != null) {
+                    builder.kind = invocationKindProtobufEnum
+                }
+            }
+
+            // TODO: Add else and do something like reporting issue?
+        }
+    }
+
+    private fun contractExpressionProto(contractDescriptionElement: ContractDescriptionElement, contractDescriptor: ContractDescriptor): ProtoBuf.Expression.Builder {
+        return contractDescriptionElement.accept(object: ContractDescriptorVisitor<ProtoBuf.Expression.Builder, Unit> {
+            override fun visitLogicalOr(logicalOr: LogicalOr, data: Unit): ProtoBuf.Expression.Builder {
+                val leftBuilder = logicalOr.left.accept(this, data)
+
+                return if (leftBuilder.andArgumentsCount != 0) {
+                    // can't flatten and re-use left builder
+                    ProtoBuf.Expression.newBuilder().apply {
+                        addOrArguments(leftBuilder)
+                        addOrArguments(contractExpressionProto(logicalOr.right, contractDescriptor))
+                    }
+                }
+                else {
+                    // we can save some space by re-using left builder instead of nesting new one
+                    leftBuilder.apply { addOrArguments(contractExpressionProto(logicalOr.right, contractDescriptor)) }
+                }
+            }
+
+            override fun visitLogicalAnd(logicalAnd: LogicalAnd, data: Unit): ProtoBuf.Expression.Builder {
+                val leftBuilder = logicalAnd.left.accept(this, data)
+
+                return if (leftBuilder.orArgumentsCount != 0) {
+                    // leftBuilder is already a sequence of Or-operators, so we can't re-use it
+                    ProtoBuf.Expression.newBuilder().apply {
+                        addAndArguments(leftBuilder)
+                        addAndArguments(contractExpressionProto(logicalAnd.right, contractDescriptor))
+                    }
+                }
+                else {
+                    // we can save some space by re-using left builder instead of nesting new one
+                    leftBuilder.apply { addAndArguments(contractExpressionProto(logicalAnd.right, contractDescriptor)) }
+                }
+            }
+
+            override fun visitLogicalNot(logicalNot: LogicalNot, data: Unit): ProtoBuf.Expression.Builder {
+                val argBuilder = logicalNot.arg.accept(this, data)
+                argBuilder.flags = Flags.IS_NEGATED.invert(argBuilder.flags)
+                return argBuilder
+            }
+
+            override fun visitIsInstancePredicate(isInstancePredicate: IsInstancePredicate, data: Unit): ProtoBuf.Expression.Builder {
+                // write variable
+                val builder = visitVariableReference(isInstancePredicate.arg, data)
+
+                // write rhs type
+                builder.setIsInstanceType(type(isInstancePredicate.type))
+                builder.isInstanceTypeId = typeId(isInstancePredicate.type)
+
+                // set flags
+                builder.flags = Flags.getContractExpressionFlags(isInstancePredicate.isNegated, false)
+
+                return builder
+            }
+
+            override fun visitIsNullPredicate(isNullPredicate: IsNullPredicate, data: Unit): ProtoBuf.Expression.Builder {
+                // get builder with variable embeded into it
+                val builder = visitVariableReference(isNullPredicate.arg, data)
+
+                // set flags
+                builder.flags = builder.flags or Flags.getContractExpressionFlags(isNullPredicate.isNegated, true)
+
+                return builder
+            }
+
+            override fun visitConstantDescriptor(constantDescriptor: ConstantDescriptor, data: Unit): ProtoBuf.Expression.Builder {
+                val builder = ProtoBuf.Expression.newBuilder()
+
+                // write constant value
+                val constantValueProtobufEnum = constantValueProtobufEnum(constantDescriptor)
+                if (constantValueProtobufEnum != null) {
+                    builder.constantValue = constantValueProtobufEnum
+                }
+
+                return builder
+            }
+
+            override fun visitVariableReference(variableReference: VariableReference, data: Unit): ProtoBuf.Expression.Builder {
+                val builder = ProtoBuf.Expression.newBuilder()
+
+                val indexOfParameter = when (variableReference.descriptor) {
+                    is ReceiverParameterDescriptor -> 0
+
+                    is ValueParameterDescriptor -> {
+                        val indexInParametersList = contractDescriptor.ownerFunction.valueParameters.withIndex()
+                                .find { it.value == variableReference.descriptor }?.index ?: return builder
+                        indexInParametersList + 1
+                    }
+
+                    else -> return builder
+                }
+
+                builder.valueParameterReference = indexOfParameter
+
+                return builder
+            }
+        }, Unit)
+    }
+
+    private fun invocationKindProtobufEnum(kind: InvocationKind): ProtoBuf.Effect.InvocationKind? = when (kind) {
+        InvocationKind.AT_MOST_ONCE -> ProtoBuf.Effect.InvocationKind.AT_MOST_ONCE
+        InvocationKind.EXACTLY_ONCE -> ProtoBuf.Effect.InvocationKind.EXACTLY_ONCE
+        InvocationKind.AT_LEAST_ONCE -> ProtoBuf.Effect.InvocationKind.AT_LEAST_ONCE
+        InvocationKind.UNKNOWN -> null
+    }
+
+    private fun constantValueProtobufEnum(constantDescriptor: ConstantDescriptor): ProtoBuf.Expression.ConstantValue? = when (constantDescriptor) {
+        BooleanConstantDescriptor.TRUE -> ProtoBuf.Expression.ConstantValue.TRUE
+        BooleanConstantDescriptor.FALSE -> ProtoBuf.Expression.ConstantValue.FALSE
+        ConstantDescriptor.NULL -> ProtoBuf.Expression.ConstantValue.NULL
+        ConstantDescriptor.NOT_NULL -> throw IllegalStateException(
+                "Internal error during serialization of function contract: NOT_NULL constant isn't denotable in protobuf format. " +
+                "Its serialization should be handled at higher level"
+        )
+        ConstantDescriptor.WILDCARD -> null
+        else -> throw IllegalArgumentException("Unknown constant: $constantDescriptor")
+    }
 
     companion object {
         @JvmStatic

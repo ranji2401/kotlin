@@ -21,6 +21,8 @@ import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationWithTarget
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationsImpl
+import org.jetbrains.kotlin.descriptors.contracts.ContractProviderKey
+import org.jetbrains.kotlin.descriptors.contracts.LazyContractProvider
 import org.jetbrains.kotlin.descriptors.impl.PropertyGetterDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.PropertySetterDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
@@ -160,6 +162,7 @@ class MemberDeserializer(private val c: DeserializationContext) {
                 c.containerSource
         )
         val local = c.childContext(function, proto.typeParameterList)
+        val lazyContractProvider = LazyContractProvider(function, {})
         function.initialize(
                 proto.receiverType(c.typeTable)?.let { local.typeDeserializer.type(it, receiverAnnotations) },
                 getDispatchReceiverParameter(),
@@ -167,7 +170,8 @@ class MemberDeserializer(private val c: DeserializationContext) {
                 local.memberDeserializer.valueParameters(proto.valueParameterList, proto, AnnotatedCallableKind.FUNCTION),
                 local.typeDeserializer.type(proto.returnType(c.typeTable)),
                 Deserialization.modality(Flags.MODALITY.get(flags)),
-                Deserialization.visibility(Flags.VISIBILITY.get(flags))
+                Deserialization.visibility(Flags.VISIBILITY.get(flags)),
+                mapOf(ContractProviderKey to lazyContractProvider)
         )
         function.isOperator = Flags.IS_OPERATOR.get(flags)
         function.isInfix = Flags.IS_INFIX.get(flags)
@@ -176,6 +180,8 @@ class MemberDeserializer(private val c: DeserializationContext) {
         function.isTailrec = Flags.IS_TAILREC.get(flags)
         function.isSuspend = Flags.IS_SUSPEND.get(flags)
         function.isExpect = Flags.IS_EXPECT_FUNCTION.get(flags)
+
+        lazyContractProvider.setContractDescriptor(ContractDeserializer(c, function).deserializeContractFromFunction(proto))
         return function
     }
 

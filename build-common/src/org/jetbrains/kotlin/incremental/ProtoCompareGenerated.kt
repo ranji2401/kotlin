@@ -354,6 +354,11 @@ open class ProtoCompareGenerated(val oldNameResolver: NameResolver, val newNameR
             if (old.sinceKotlinInfo != new.sinceKotlinInfo) return false
         }
 
+        if (old.hasContract() != new.hasContract()) return false
+        if (old.hasContract()) {
+            if (!checkEquals(old.contract, new.contract)) return false
+        }
+
         if (old.hasExtension(JvmProtoBuf.methodSignature) != new.hasExtension(JvmProtoBuf.methodSignature)) return false
         if (old.hasExtension(JvmProtoBuf.methodSignature)) {
             if (!checkEquals(old.getExtension(JvmProtoBuf.methodSignature), new.getExtension(JvmProtoBuf.methodSignature))) return false
@@ -745,6 +750,12 @@ open class ProtoCompareGenerated(val oldNameResolver: NameResolver, val newNameR
         return true
     }
 
+    open fun checkEquals(old: ProtoBuf.Contract, new: ProtoBuf.Contract): Boolean {
+        if (!checkEqualsContractEffect(old, new)) return false
+
+        return true
+    }
+
     open fun checkEquals(old: JvmProtoBuf.JvmMethodSignature, new: JvmProtoBuf.JvmMethodSignature): Boolean {
         if (old.hasName() != new.hasName()) return false
         if (old.hasName()) {
@@ -885,6 +896,27 @@ open class ProtoCompareGenerated(val oldNameResolver: NameResolver, val newNameR
         return true
     }
 
+    open fun checkEquals(old: ProtoBuf.Effect, new: ProtoBuf.Effect): Boolean {
+        if (old.hasEffectType() != new.hasEffectType()) return false
+        if (old.hasEffectType()) {
+            if (old.effectType != new.effectType) return false
+        }
+
+        if (!checkEqualsEffectEffectConstructorArguments(old, new)) return false
+
+        if (old.hasConclusionOfConditionalEffect() != new.hasConclusionOfConditionalEffect()) return false
+        if (old.hasConclusionOfConditionalEffect()) {
+            if (!checkEquals(old.conclusionOfConditionalEffect, new.conclusionOfConditionalEffect)) return false
+        }
+
+        if (old.hasKind() != new.hasKind()) return false
+        if (old.hasKind()) {
+            if (old.kind != new.kind) return false
+        }
+
+        return true
+    }
+
     open fun checkEquals(old: JvmProtoBuf.JvmFieldSignature, new: JvmProtoBuf.JvmFieldSignature): Boolean {
         if (old.hasName() != new.hasName()) return false
         if (old.hasName()) {
@@ -895,6 +927,39 @@ open class ProtoCompareGenerated(val oldNameResolver: NameResolver, val newNameR
         if (old.hasDesc()) {
             if (!checkStringEquals(old.desc, new.desc)) return false
         }
+
+        return true
+    }
+
+    open fun checkEquals(old: ProtoBuf.Expression, new: ProtoBuf.Expression): Boolean {
+        if (old.hasFlags() != new.hasFlags()) return false
+        if (old.hasFlags()) {
+            if (old.flags != new.flags) return false
+        }
+
+        if (old.hasValueParameterReference() != new.hasValueParameterReference()) return false
+        if (old.hasValueParameterReference()) {
+            if (old.valueParameterReference != new.valueParameterReference) return false
+        }
+
+        if (old.hasConstantValue() != new.hasConstantValue()) return false
+        if (old.hasConstantValue()) {
+            if (old.constantValue != new.constantValue) return false
+        }
+
+        if (old.hasIsInstanceType() != new.hasIsInstanceType()) return false
+        if (old.hasIsInstanceType()) {
+            if (!checkEquals(old.isInstanceType, new.isInstanceType)) return false
+        }
+
+        if (old.hasIsInstanceTypeId() != new.hasIsInstanceTypeId()) return false
+        if (old.hasIsInstanceTypeId()) {
+            if (old.isInstanceTypeId != new.isInstanceTypeId) return false
+        }
+
+        if (!checkEqualsExpressionAndArguments(old, new)) return false
+
+        if (!checkEqualsExpressionOrArguments(old, new)) return false
 
         return true
     }
@@ -1149,11 +1214,51 @@ open class ProtoCompareGenerated(val oldNameResolver: NameResolver, val newNameR
         return true
     }
 
+    open fun checkEqualsContractEffect(old: ProtoBuf.Contract, new: ProtoBuf.Contract): Boolean {
+        if (old.effectCount != new.effectCount) return false
+
+        for(i in 0..old.effectCount - 1) {
+            if (!checkEquals(old.getEffect(i), new.getEffect(i))) return false
+        }
+
+        return true
+    }
+
     open fun checkEqualsAnnotationArgumentValueArrayElement(old: ProtoBuf.Annotation.Argument.Value, new: ProtoBuf.Annotation.Argument.Value): Boolean {
         if (old.arrayElementCount != new.arrayElementCount) return false
 
         for(i in 0..old.arrayElementCount - 1) {
             if (!checkEquals(old.getArrayElement(i), new.getArrayElement(i))) return false
+        }
+
+        return true
+    }
+
+    open fun checkEqualsEffectEffectConstructorArguments(old: ProtoBuf.Effect, new: ProtoBuf.Effect): Boolean {
+        if (old.effectConstructorArgumentsCount != new.effectConstructorArgumentsCount) return false
+
+        for(i in 0..old.effectConstructorArgumentsCount - 1) {
+            if (!checkEquals(old.getEffectConstructorArguments(i), new.getEffectConstructorArguments(i))) return false
+        }
+
+        return true
+    }
+
+    open fun checkEqualsExpressionAndArguments(old: ProtoBuf.Expression, new: ProtoBuf.Expression): Boolean {
+        if (old.andArgumentsCount != new.andArgumentsCount) return false
+
+        for(i in 0..old.andArgumentsCount - 1) {
+            if (!checkEquals(old.getAndArguments(i), new.getAndArguments(i))) return false
+        }
+
+        return true
+    }
+
+    open fun checkEqualsExpressionOrArguments(old: ProtoBuf.Expression, new: ProtoBuf.Expression): Boolean {
+        if (old.orArgumentsCount != new.orArgumentsCount) return false
+
+        for(i in 0..old.orArgumentsCount - 1) {
+            if (!checkEquals(old.getOrArguments(i), new.getOrArguments(i))) return false
         }
 
         return true
@@ -1355,6 +1460,10 @@ fun ProtoBuf.Function.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes: (Int)
 
     if (hasSinceKotlinInfo()) {
         hashCode = 31 * hashCode + sinceKotlinInfo
+    }
+
+    if (hasContract()) {
+        hashCode = 31 * hashCode + contract.hashCode(stringIndexes, fqNameIndexes)
     }
 
     if (hasExtension(JvmProtoBuf.methodSignature)) {
@@ -1696,6 +1805,16 @@ fun ProtoBuf.ValueParameter.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes:
     return hashCode
 }
 
+fun ProtoBuf.Contract.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes: (Int) -> Int): Int {
+    var hashCode = 1
+
+    for(i in 0..effectCount - 1) {
+        hashCode = 31 * hashCode + getEffect(i).hashCode(stringIndexes, fqNameIndexes)
+    }
+
+    return hashCode
+}
+
 fun JvmProtoBuf.JvmMethodSignature.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes: (Int) -> Int): Int {
     var hashCode = 1
 
@@ -1828,6 +1947,28 @@ fun ProtoBuf.Annotation.Argument.hashCode(stringIndexes: (Int) -> Int, fqNameInd
     return hashCode
 }
 
+fun ProtoBuf.Effect.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes: (Int) -> Int): Int {
+    var hashCode = 1
+
+    if (hasEffectType()) {
+        hashCode = 31 * hashCode + effectType.hashCode()
+    }
+
+    for(i in 0..effectConstructorArgumentsCount - 1) {
+        hashCode = 31 * hashCode + getEffectConstructorArguments(i).hashCode(stringIndexes, fqNameIndexes)
+    }
+
+    if (hasConclusionOfConditionalEffect()) {
+        hashCode = 31 * hashCode + conclusionOfConditionalEffect.hashCode(stringIndexes, fqNameIndexes)
+    }
+
+    if (hasKind()) {
+        hashCode = 31 * hashCode + kind.hashCode()
+    }
+
+    return hashCode
+}
+
 fun JvmProtoBuf.JvmFieldSignature.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes: (Int) -> Int): Int {
     var hashCode = 1
 
@@ -1837,6 +1978,40 @@ fun JvmProtoBuf.JvmFieldSignature.hashCode(stringIndexes: (Int) -> Int, fqNameIn
 
     if (hasDesc()) {
         hashCode = 31 * hashCode + stringIndexes(desc)
+    }
+
+    return hashCode
+}
+
+fun ProtoBuf.Expression.hashCode(stringIndexes: (Int) -> Int, fqNameIndexes: (Int) -> Int): Int {
+    var hashCode = 1
+
+    if (hasFlags()) {
+        hashCode = 31 * hashCode + flags
+    }
+
+    if (hasValueParameterReference()) {
+        hashCode = 31 * hashCode + valueParameterReference
+    }
+
+    if (hasConstantValue()) {
+        hashCode = 31 * hashCode + constantValue.hashCode()
+    }
+
+    if (hasIsInstanceType()) {
+        hashCode = 31 * hashCode + isInstanceType.hashCode(stringIndexes, fqNameIndexes)
+    }
+
+    if (hasIsInstanceTypeId()) {
+        hashCode = 31 * hashCode + isInstanceTypeId
+    }
+
+    for(i in 0..andArgumentsCount - 1) {
+        hashCode = 31 * hashCode + getAndArguments(i).hashCode(stringIndexes, fqNameIndexes)
+    }
+
+    for(i in 0..orArgumentsCount - 1) {
+        hashCode = 31 * hashCode + getOrArguments(i).hashCode(stringIndexes, fqNameIndexes)
     }
 
     return hashCode
