@@ -1,0 +1,8 @@
+package
+
+public fun callsAndInverts(/*0*/ b: kotlin.Boolean, /*1*/ block: () -> kotlin.Unit): kotlin.Boolean
+    CallsInPlace(block, EXACTLY_ONCE)
+    Returns(TRUE) -> !b
+    Returns(FALSE) -> b
+
+public fun smartcastAndInitialization(/*0*/ x: kotlin.Any?): kotlin.Unit
