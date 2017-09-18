@@ -109,7 +109,8 @@ abstract class CommonCompilerArguments : CommonToolArguments() {
     open fun configureAnalysisFlags(collector: MessageCollector): MutableMap<AnalysisFlag<*>, Any> {
         return HashMap<AnalysisFlag<*>, Any>().apply {
             put(AnalysisFlag.skipMetadataVersionCheck, skipMetadataVersionCheck)
-            put(AnalysisFlag.multiPlatformDoNotCheckActual, noCheckActual)
+            put(AnalysisFlag.multiPlatformDoNotCheckActual, noCheckActual),
+            put(AnalysisFlag.allowKotlinPackage, allowKotlinPackage)
         }
     }
 
