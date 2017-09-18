@@ -79,7 +79,7 @@ open class LazyDeclarationResolver @Deprecated("") constructor(
         scope.getContributedClassifier(classObjectOrScript.nameAsSafeName, location)
         val descriptor = bindingContext.get(BindingContext.DECLARATION_TO_DESCRIPTOR, classObjectOrScript)
 
-        return descriptor as ClassDescriptor?
+        return descriptor as? ClassDescriptor
     }
 
     private fun findClassDescriptor(
@@ -175,15 +175,15 @@ open class LazyDeclarationResolver @Deprecated("") constructor(
                         }
                     }
                     is KtNamedFunction -> {
-                        val function = visitNamedFunction(grandFather, data) as FunctionDescriptor?
-                        function!!.valueParameters
+                        val function = visitNamedFunction(grandFather, data) as? FunctionDescriptor
+                        function?.valueParameters
                         return bindingContext.get(BindingContext.VALUE_PARAMETER, parameter)
                     }
                     is KtSecondaryConstructor -> {
                         val constructorDescriptor = visitSecondaryConstructor(
                                 grandFather, data
-                        ) as ConstructorDescriptor?
-                        constructorDescriptor!!.valueParameters
+                        ) as? ConstructorDescriptor
+                        constructorDescriptor?.valueParameters
                         return bindingContext.get(BindingContext.VALUE_PARAMETER, parameter)
                     }
                     else -> //TODO: support parameters in accessors and other places(?)
@@ -192,12 +192,12 @@ open class LazyDeclarationResolver @Deprecated("") constructor(
             }
 
             override fun visitSecondaryConstructor(constructor: KtSecondaryConstructor, data: Nothing?): DeclarationDescriptor? {
-                getClassDescriptorIfAny(constructor.parent.parent as KtClassOrObject, lookupLocationFor(constructor, false))!!.constructors
+                getClassDescriptorIfAny(constructor.parent.parent as KtClassOrObject, lookupLocationFor(constructor, false))?.constructors
                 return bindingContext.get(BindingContext.CONSTRUCTOR, constructor)
             }
 
             override fun visitPrimaryConstructor(constructor: KtPrimaryConstructor, data: Nothing?): DeclarationDescriptor? {
-                getClassDescriptorIfAny(constructor.getContainingClassOrObject(), lookupLocationFor(constructor, false))!!.constructors
+                getClassDescriptorIfAny(constructor.getContainingClassOrObject(), lookupLocationFor(constructor, false))?.constructors
                 return bindingContext.get(BindingContext.CONSTRUCTOR, constructor)
             }
 
@@ -246,7 +246,7 @@ open class LazyDeclarationResolver @Deprecated("") constructor(
             val packageDescriptor = topLevelDescriptorProvider.getPackageFragment(fqName)
             if (packageDescriptor == null) {
                 if (topLevelDescriptorProvider is LazyClassContext) {
-                    (topLevelDescriptorProvider as LazyClassContext).declarationProviderFactory.diagnoseMissingPackageFragment(ktFile)
+                    topLevelDescriptorProvider.declarationProviderFactory.diagnoseMissingPackageFragment(ktFile)
                 }
                 else {
                     throw IllegalStateException("Cannot find package fragment for file " + ktFile.name + " with package " + fqName)
@@ -256,8 +256,8 @@ open class LazyDeclarationResolver @Deprecated("") constructor(
         }
         else {
             return when (parentDeclaration) {
-                is KtClassOrObject -> getClassDescriptor((parentDeclaration as KtClassOrObject?)!!, location).unsubstitutedMemberScope
-                is KtScript -> getScriptDescriptor((parentDeclaration as KtScript?)!!, location).unsubstitutedMemberScope
+                is KtClassOrObject -> getClassDescriptor(parentDeclaration, location).unsubstitutedMemberScope
+                is KtScript -> getScriptDescriptor(parentDeclaration, location).unsubstitutedMemberScope
                 else -> throw IllegalStateException("Don't call this method for local declarations: " + declaration + "\n" +
                                                     declaration.getElementTextWithContext())
             }
