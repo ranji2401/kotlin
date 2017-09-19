@@ -389,6 +389,12 @@ public class ForeignAnnotationsNoAnnotationInClasspathWithFastClassReadingTestGe
             KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/foreignAnnotations/tests/typeQualifierDefault"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
         }
 
+        @TestMetadata("defaultAndNicknameMigrationPolicy.kt")
+        public void testDefaultAndNicknameMigrationPolicy() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/foreignAnnotations/tests/typeQualifierDefault/defaultAndNicknameMigrationPolicy.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("fieldsAreNullable.kt")
         public void testFieldsAreNullable() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/foreignAnnotations/tests/typeQualifierDefault/fieldsAreNullable.kt");
