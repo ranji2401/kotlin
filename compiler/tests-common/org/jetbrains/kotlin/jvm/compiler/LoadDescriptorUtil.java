@@ -28,8 +28,10 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.codegen.GenerationUtils;
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime;
 import org.jetbrains.kotlin.codegen.state.GenerationState;
+import org.jetbrains.kotlin.config.CommonConfigurationKeys;
 import org.jetbrains.kotlin.config.CompilerConfiguration;
 import org.jetbrains.kotlin.config.JVMConfigurationKeys;
+import org.jetbrains.kotlin.config.LanguageVersionSettings;
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor;
 import org.jetbrains.kotlin.descriptors.PackageViewDescriptor;
 import org.jetbrains.kotlin.jvm.compiler.javac.JavacRegistrarForTests;
@@ -43,6 +45,7 @@ import org.jetbrains.kotlin.test.KotlinTestUtils;
 import org.jetbrains.kotlin.test.TestJdkKind;
 import org.jetbrains.kotlin.utils.ExceptionUtilsKt;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -74,7 +77,8 @@ public class LoadDescriptorUtil {
             @NotNull ConfigurationKind configurationKind,
             boolean isBinaryRoot,
             boolean useFastClassReading,
-            boolean useJavacWrapper
+            boolean useJavacWrapper,
+            @Nullable LanguageVersionSettings explicitLanguageVersionSettings
     ) {
         List<File> javaBinaryRoots = new ArrayList<>();
         javaBinaryRoots.add(KotlinTestUtils.getAnnotationsJar());
@@ -91,6 +95,9 @@ public class LoadDescriptorUtil {
                 KotlinTestUtils.newConfiguration(configurationKind, testJdkKind, javaBinaryRoots, javaSourceRoots);
         configuration.put(JVMConfigurationKeys.USE_FAST_CLASS_FILES_READING, useFastClassReading);
         configuration.put(JVMConfigurationKeys.USE_JAVAC, useJavacWrapper);
+        if (explicitLanguageVersionSettings != null) {
+            configuration.put(CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS, explicitLanguageVersionSettings);
+        }
         KotlinCoreEnvironment environment =
                 KotlinCoreEnvironment.createForTests(disposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES);
         if (useJavacWrapper) {

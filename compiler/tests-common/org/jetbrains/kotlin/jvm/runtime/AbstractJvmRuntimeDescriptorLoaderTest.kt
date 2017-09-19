@@ -93,6 +93,7 @@ abstract class AbstractJvmRuntimeDescriptorLoaderTest : TestCaseWithTmpdir() {
                 /* checkPropertyAccessors = */ true,
                 /* includeMethodsOfKotlinAny = */ false,
                 /* renderDeclarationsFromOtherModules = */ true,
+                /* checkFunctionContract = */ false,
                 // Skip Java annotation constructors because order of their parameters is not retained at runtime
                 { descriptor -> !descriptor!!.isJavaAnnotationConstructor() },
                 errorTypesForbidden(), renderer
@@ -105,7 +106,7 @@ abstract class AbstractJvmRuntimeDescriptorLoaderTest : TestCaseWithTmpdir() {
         }
 
         val expected = LoadDescriptorUtil.loadTestPackageAndBindingContextFromJavaRoot(
-                tmpdir, testRootDisposable, jdkKind, ConfigurationKind.ALL, true, false, false
+                tmpdir, testRootDisposable, jdkKind, ConfigurationKind.ALL, true, false, false, null
         ).first
 
         RecursiveDescriptorComparator.validateAndCompareDescriptors(expected, actual, comparatorConfiguration, null)
